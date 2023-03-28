@@ -3,6 +3,24 @@
 
 int N = 50;
 
+struct Material {
+    vec3 base_color = vec3(1.0f);
+    vec3 emission;
+    bool is_emit;
+    float metallic = 0.5;
+    float roughness = 0.1;
+    float specular = 0.5;
+    float specular_tint = 0.5;
+    float sheen;
+    float sheen_tint;
+    float subsurface;
+    float clearcoat;
+    float clearcoat_gloss;
+    float anisotropic;
+    float index_of_refraction = 1.2;
+    float spec_trans = 0.5;
+};
+
 // bxdf
 // ---------------------------------------------- //
 float pow2(float x) { return x * x; }
@@ -31,23 +49,6 @@ float fresnel(float cosI, float etaI, float etaT) {
 	float Rp = pow2((etaI * cosT - etaT * cosI) / (etaI * cosT + etaT * cosI));
 	return (Rl + Rp) / 2;
 }
-struct Material {
-	vec3 base_color;
-	vec3 emission;
-	bool is_emit;
-	float metallic = 0.5;
-	float roughness = 1;
-	float specular = 0.5;
-	float specular_tint = 0.5;
-	float sheen;
-	float sheen_tint;
-	float subsurface;
-	float clearcoat;
-	float clearcoat_gloss;
-	float anisotropic;
-	float index_of_refraction = 1.2;
-	float spec_trans = 0.5;
-};
 
 // L(in), N(same direction with L), V(out)
 vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
@@ -115,14 +116,13 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 
 	vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 
-	return diffuse * (1 - m_metallic) + specular;
+	return mix(diffuse, specular, m_metallic) * 10.0f;
 }
 
 // 在m上，L方向入射，V方向出射，面法向为N（指向外），纹理坐标uv
 vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 	vec3 LN = dot(L, N) > 0 ? N : -N;
 	if(dot(V, LN) > 0) {
-		return vec3(0);
 		return brdf(m, L, V, LN, uv);
 	} else {
 		float ior1 = 1, ior2 = m.index_of_refraction;
@@ -136,8 +136,66 @@ vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 }
 
 
+void draw() {
+
+    vec3 L = normalize(vec3(-1, 1, 0));
+    Material mat;
+
+    // 坐标系
+    {
+        glLineWidth(10);
+        glBegin(GL_LINES);
+        glColor3f(1, 0, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(10, 0, 0);
+
+        glColor3f(0, 1, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 10, 0);
+
+        glColor3f(0, 0, 1);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 0, 10);
+        glEnd();
+    }
+
+    glLineWidth(5);
+    glBegin(GL_LINES);
+    glColor3f(1, 0, 1);
+    glVertex3f(0, 0, 0);
+    glVertex3f(L.x * 10, L.y * 10, L.z * 10);
+    glEnd();
+
+    glLineWidth(1);
+    glBegin(GL_LINES);
+
+//    bxdf(mat, L, normalize(vec3(2, 1, 0)), vec3(0, 1, 0), vec2(0, 0));
+
+    srand(0);
+    for(int i = 0;i < 500;i++) {
+        float theta = rand() * 1.0f / RAND_MAX * 2 * PI - PI;
+        float phi = rand() * 1.0f / RAND_MAX * PI - PI / 2;
+
+        float r = cos(phi);
+        vec3 V = normalize(vec3(cos(theta) * r, sin(phi), sin(theta) * r));
+        vec3 f_r = bxdf(mat, L, V, vec3(0, 1, 0), vec2(0, 0));
+
+        if(_isnan(f_r.x) || _isnan(f_r.y) || _isnan(f_r.z)) {
+            glColor3f(1, 0, 0);
+            glVertex3f(0, 0, 0);
+            glVertex3f(V.x, V.y, V.z);
+        } else {
+            glColor3f(1, 1, 1);
+            V = V * length(f_r);
+            glVertex3f(0, 0, 0);
+            glVertex3f(V.x, V.y, V.z);
+        }
+    }
+    glEnd();
+}
+
 int main(int argc, char** argv) {
 
-	GLCanvas::initialize(argc, argv);
+	GLCanvas::initialize(argc, argv, draw);
     return 0;
 }

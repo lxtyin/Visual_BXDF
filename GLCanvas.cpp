@@ -4,18 +4,20 @@
 
 #include "GLCanvas.h"
 
+Transform GLCanvas::transform;
+void (*GLCanvas::draw)() = nullptr;
 void GLCanvas::display() {
-	glColor3f(0, 1, 0);
-	glBegin(GL_LINES);
-	glVertex3d(0, 1, 0);
-	glVertex3d(1, 0, 1);
-	glEnd();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    draw();
+
+    glutSwapBuffers();
 }
 
 // x, y: mouse location
 void GLCanvas::keyboard(unsigned char key, int x, int y) {
 
-	float speed = 50, dt = 0.01;
+	float speed = 5, dt = 0.01;
 	if(key == 'w'){
 		transform.position += transform.direction_z() * -speed * dt;
 	}
@@ -28,29 +30,41 @@ void GLCanvas::keyboard(unsigned char key, int x, int y) {
 	if(key == 'a'){
 		transform.position += transform.direction_x() * -speed * dt;
 	}
-	if(key == 'j') transform.rotation += vec3(0, dt, 0);
-	if(key == 'l') transform.rotation += vec3(0, -dt, 0);
+	if(key == 'l') transform.rotation += vec3(0, dt, 0);
+	if(key == 'j') transform.rotation += vec3(0, -dt, 0);
 	if(key == 'i') transform.rotation += vec3(-dt, 0, 0);
 	if(key == 'k') transform.rotation += vec3(dt, 0, 0);
 	if(key == 'q') exit(0);
 
-	vec3 tar = transform.position + transform.direction_z();
-	gluLookAt(transform.position.x, transform.position.y, transform.position.z,
-		tar.x, tar.y, tar.z, 0, 1, 0);
+    if(key == 't') return;
+
+	vec3 tar = transform.position - transform.direction_z();
+    vec3 up = transform.direction_y();
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity(); // 指定当前矩阵为单位矩阵
+    gluLookAt(transform.position.x, transform.position.y, transform.position.z,
+              tar.x, tar.y, tar.z, up.x, up.y, up.z);
 	glutPostRedisplay();
 }
 
-void GLCanvas::initialize(int argc, char** argv) {
+void GLCanvas::initialize(int argc, char** argv, void (*dr)()) {
+    draw = dr;
 	glutInit(&argc, argv);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glutInitDisplayMode(GLUT_DOUBLE| GLUT_DEPTH |GLUT_RGBA);
 	glutInitWindowSize(800, 800);
 	glutCreateWindow("hello window");
 
-	glClearColor(0, 0, 0, 0);
-	glMatrixMode(GL_PROJECTION);
-	gluOrtho2D(0, 100, 0, 100); // 视口大小
+    glMatrixMode(GL_PROJECTION);//设置当前矩阵为投影矩阵.
+    glLoadIdentity(); // 指定当前矩阵为单位矩阵
+    gluPerspective(90, 1, 0.01, 500);
+
+    transform.position = vec3(0, 0, 10);
 
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 
+    keyboard('w', 0, 0);
 	glutMainLoop();
 }

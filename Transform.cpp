@@ -36,8 +36,8 @@ mat4 Transform::matrix() {
 				0,   	0,  	0, 		1 };
 	mat4 res(1);
 	for(char c: order){
-		if(c == 'X') res *= rot_x;
-		if(c == 'Y') res *= rot_y;
+        if(c == 'X') res *= rot_x;
+        if(c == 'Y') res *= rot_y;
 		if(c == 'Z') res *= rot_z;
 
 	}

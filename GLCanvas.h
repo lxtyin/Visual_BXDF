@@ -18,8 +18,9 @@ class GLCanvas {
 	// Callback functions for mouse and keyboard events
 	static void display();
 	static void keyboard(unsigned char key, int x, int y);
+    static void (*draw)();
  public:
-	static void initialize(int argc, char** argv) ;
+	static void initialize(int argc, char** argv, void (*draw)());
 };
 
 #endif //OPENGL__GLCANVAS_H_
