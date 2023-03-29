@@ -59,9 +59,10 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
 	float eta = ior2 / ior1;
 	vec3 H = -normalize(L + eta * V);
 	float NdotH = dot(N, H);
+	if(NdotH <= 0) H = -H;
 	float LdotH = dot(L, H);
 	float VdotH = dot(V, H);
-	if(LdotH * VdotH <= 0) return vec3(0);
+	if(LdotH * VdotH >= 0) return vec3(0);
 
 	float m_roughness = m.roughness;
 	float m_metallic = m.metallic;
@@ -70,6 +71,7 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
 	float sqrtDenom = LdotH + eta * VdotH;
 	float Ds = GTR2(NdotH, m_roughness);
 	float iFs = 1 - fresnel(LdotH, ior1, ior2);
+	if(iFs <= 0) return vec3(0, 0, 0); // 全反射
 	float Gs = smithG_GGX(abs(NdotL), m_roughness);
 	Gs *= smithG_GGX(abs(NdotV), m_roughness);
 
@@ -85,7 +87,7 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 	float NdotV = dot(N, V);
 	float NdotH = dot(N, H);
 	float LdotH = dot(L, H);
-	if(NdotL < 0 || NdotV < 0) return vec3(0); // assert!
+	if(NdotL <= 0 || NdotV <= 0) return vec3(0); // assert!
 
 	float m_roughness = m.roughness;
 	float m_metallic = m.metallic;
@@ -100,7 +102,7 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 	float FL = pow5(1 - NdotL), FV = pow5(1 - NdotV);
 	float Fd90 = 0.5 + 2 * LdotH*LdotH * m_roughness;
 	float Fd = mix(1.0f, Fd90, FL) * mix(1.0f, Fd90, FV);
-	vec3 diffuse = IVPI * Fd * Cdlin;
+	vec3 diffuse = IVPI * Fd * Cdlin * (1 - m.spec_trans);
 
 	// subsurface
 //    float Fss90 = LdotH * LdotH * m_roughness;
@@ -116,13 +118,15 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 
 	vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 
-	return mix(diffuse, specular, m_metallic) * 10.0f;
+	// 菲涅尔项已经蕴含了金属度
+	return diffuse * (1 - m_metallic) + specular;
+//	return mix(diffuse, specular, m_metallic);
 }
 
 // 在m上，L方向入射，V方向出射，面法向为N（指向外），纹理坐标uv
 vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 	vec3 LN = dot(L, N) > 0 ? N : -N;
-	if(dot(V, LN) > 0) {
+	if(dot(V, LN) >= 0) {
 		return brdf(m, L, V, LN, uv);
 	} else {
 		float ior1 = 1, ior2 = m.index_of_refraction;
@@ -138,7 +142,7 @@ vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 
 void draw() {
 
-    vec3 L = normalize(vec3(-1, 1, 0));
+    vec3 L = normalize(vec3(-0.2, -1, 0));
     Material mat;
 
     // 坐标系
@@ -169,10 +173,10 @@ void draw() {
     glLineWidth(1);
     glBegin(GL_LINES);
 
-//    bxdf(mat, L, normalize(vec3(2, 1, 0)), vec3(0, 1, 0), vec2(0, 0));
+    bxdf(mat, L, normalize(vec3(-1, 0.2, 0)), vec3(0, 1, 0), vec2(0, 0));
 
     srand(0);
-    for(int i = 0;i < 500;i++) {
+    for(int i = 0;i < 1000;i++) {
         float theta = rand() * 1.0f / RAND_MAX * 2 * PI - PI;
         float phi = rand() * 1.0f / RAND_MAX * PI - PI / 2;
 

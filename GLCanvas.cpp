@@ -5,7 +5,11 @@
 #include "GLCanvas.h"
 
 Transform GLCanvas::transform;
-void (*GLCanvas::draw)() = nullptr;
+void(*GLCanvas::draw)() = nullptr;
+int GLCanvas::mouseButton = 0;
+int GLCanvas::mouseX = 0;
+int GLCanvas::mouseY = 0;
+
 void GLCanvas::display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -17,7 +21,7 @@ void GLCanvas::display() {
 // x, y: mouse location
 void GLCanvas::keyboard(unsigned char key, int x, int y) {
 
-	float speed = 5, dt = 0.01;
+	float speed = 10, dt = 0.01;
 	if(key == 'w'){
 		transform.position += transform.direction_z() * -speed * dt;
 	}
@@ -30,21 +34,37 @@ void GLCanvas::keyboard(unsigned char key, int x, int y) {
 	if(key == 'a'){
 		transform.position += transform.direction_x() * -speed * dt;
 	}
-	if(key == 'l') transform.rotation += vec3(0, dt, 0);
-	if(key == 'j') transform.rotation += vec3(0, -dt, 0);
-	if(key == 'i') transform.rotation += vec3(-dt, 0, 0);
-	if(key == 'k') transform.rotation += vec3(dt, 0, 0);
 	if(key == 'q') exit(0);
 
-    if(key == 't') return;
+	update_camera();
+}
 
+void GLCanvas::mouse(int button, int state, int x, int y) {
+	// Save the current state of the mouse.  This will be
+	// used by the 'motion' function
+	mouseButton = button;
+	mouseX = x;
+	mouseY = y;
+}
+
+void GLCanvas::motion(int x, int y) {
+	if(mouseButton == GLUT_LEFT_BUTTON) {
+		transform.rotation += vec3(0, (mouseX - x) * -0.01, 0);
+		transform.rotation += vec3((mouseY - y) * -0.01, 0, 0);
+		mouseX = x;
+		mouseY = y;
+		update_camera();
+	}
+}
+
+void GLCanvas::update_camera() {
 	vec3 tar = transform.position - transform.direction_z();
-    vec3 up = transform.direction_y();
+	vec3 up = transform.direction_y();
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity(); // 指定当前矩阵为单位矩阵
-    gluLookAt(transform.position.x, transform.position.y, transform.position.z,
-              tar.x, tar.y, tar.z, up.x, up.y, up.z);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity(); // 指定当前矩阵为单位矩阵
+	gluLookAt(transform.position.x, transform.position.y, transform.position.z,
+		tar.x, tar.y, tar.z, up.x, up.y, up.z);
 	glutPostRedisplay();
 }
 
@@ -64,6 +84,8 @@ void GLCanvas::initialize(int argc, char** argv, void (*dr)()) {
 
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
+	glutMouseFunc(mouse);
+	glutMotionFunc(motion);
 
     keyboard('w', 0, 0);
 	glutMainLoop();

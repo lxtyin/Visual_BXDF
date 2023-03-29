@@ -14,11 +14,18 @@
 class GLCanvas {
 
 	static Transform transform;
+	static int mouseButton;
+	static int mouseX;
+	static int mouseY;
 
 	// Callback functions for mouse and keyboard events
 	static void display();
 	static void keyboard(unsigned char key, int x, int y);
+	static void mouse(int button, int state, int x, int y);
+	static void motion(int x, int y);
     static void (*draw)();
+
+	static void update_camera();
  public:
 	static void initialize(int argc, char** argv, void (*draw)());
 };
