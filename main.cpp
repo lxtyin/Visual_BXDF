@@ -1,5 +1,7 @@
+#include <bits/stdc++.h>
 #include "GLCanvas.h"
 #include "GLSL.h"
+using namespace std;
 
 int N = 50;
 
@@ -8,7 +10,7 @@ struct Material {
     vec3 emission;
     bool is_emit;
     float metallic = 0.5;
-    float roughness = 0.1;
+    float roughness = 0.9;
     float specular = 0.5;
     float specular_tint = 0.5;
     float sheen;
@@ -21,17 +23,53 @@ struct Material {
     float spec_trans = 0.5;
 };
 
-// bxdf
-// ---------------------------------------------- //
+vec3 to_world(vec3 v, vec3 n) {
+    vec3 help = vec3(1, 0, 0);
+    if(abs(n.x) > 0.999) help = vec3(0, 0, 1);
+    vec3 t = normalize(cross(n, help));
+    vec3 b = normalize(cross(n, t));
+    return normalize(v.x * t + v.y * b + v.z * n);
+}
 float pow2(float x) { return x * x; }
 float pow5(float x) {
-	float t = x * x;
-	return t * t * x;
+    float t = x * x;
+    return t * t * x;
 }
-float smithG_GGX(float NdotV, float a) {
-	float a2 = a * a;
-	float b = NdotV*NdotV;
-	return 1 / (NdotV + sqrt(a2 + b - a2*b));
+float rand01() {
+    return rand() * 1.0 / RAND_MAX;
+}
+
+vec3 GTR2_sample(Material m, vec2 uv, vec3 nor, float &pdf) {
+    float m_roughness = m.roughness;
+    float alpha2 = max(0.01f, m_roughness * m_roughness);
+    float x = rand01();
+
+    float cos_theta = sqrt((1. - x) / (x * (alpha2 - 1) + 1));
+    float cos2 = cos_theta * cos_theta;
+    float phi = rand01() * 2 * PI;
+    float r = sqrt(1. - cos2);
+
+    pdf = 2. * alpha2 * cos_theta * r / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
+    vec3 h = normalize(vec3(r * cos(phi), r * sin(phi), cos_theta));
+    return to_world(h, nor);
+}
+float GTR2_sample_pdf(Material m, vec2 uv, vec3 nor, vec3 h) {
+    float cos_theta = abs(dot(h, nor));
+    if(cos_theta < 0) return 0;
+    float m_roughness = m.roughness;
+    float alpha2 = max(0.01f, m_roughness * m_roughness);
+    float cos2 = cos_theta * cos_theta;
+    float pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
+    return pdf;
+}
+
+// bxdf
+// ---------------------------------------------- //
+
+float smithG_GGX(float NdotV, float roughness) {
+    float a2 = pow2(pow2(0.5 + roughness / 2));
+    float b = NdotV*NdotV;
+    return 2.0f * b / (NdotV + sqrt(a2 + b - a2*b));
 }
 float GTR2(float NdotH, float a) {
 	float a2 = a * a;
@@ -115,7 +153,6 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 	vec3 Fs = SchlickFresnel(Cspec0, LdotH);
 	float Gs = smithG_GGX(NdotL, m_roughness);
 	Gs *= smithG_GGX(NdotV, m_roughness);
-
 	vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 
 	// 菲涅尔项已经蕴含了金属度
@@ -142,7 +179,7 @@ vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 
 void draw() {
 
-    vec3 L = normalize(vec3(-0.2, -1, 0));
+    vec3 L = normalize(vec3(-2, 1, 0));
     Material mat;
 
     // 坐标系
@@ -176,24 +213,32 @@ void draw() {
     bxdf(mat, L, normalize(vec3(-1, 0.2, 0)), vec3(0, 1, 0), vec2(0, 0));
 
     srand(0);
-    for(int i = 0;i < 1000;i++) {
-        float theta = rand() * 1.0f / RAND_MAX * 2 * PI - PI;
-        float phi = rand() * 1.0f / RAND_MAX * PI - PI / 2;
+    for(int i = 0;i < 100;i++) {
 
-        float r = cos(phi);
-        vec3 V = normalize(vec3(cos(theta) * r, sin(phi), sin(theta) * r));
-        vec3 f_r = bxdf(mat, L, V, vec3(0, 1, 0), vec2(0, 0));
+        float pdf;
+        vec3 V = GTR2_sample(mat, vec2(0, 0), vec3(0, 0, 1), pdf);
+        glColor3f(1, 1, 1);
+        glVertex3f(0, 0, 0);
+        V = V * pdf;
+        glVertex3f(V.x, V.y, V.z);
 
-        if(_isnan(f_r.x) || _isnan(f_r.y) || _isnan(f_r.z)) {
-            glColor3f(1, 0, 0);
-            glVertex3f(0, 0, 0);
-            glVertex3f(V.x, V.y, V.z);
-        } else {
-            glColor3f(1, 1, 1);
-            V = V * length(f_r);
-            glVertex3f(0, 0, 0);
-            glVertex3f(V.x, V.y, V.z);
-        }
+//        float theta = rand() * 1.0f / RAND_MAX * 2 * PI - PI;
+//        float phi = rand() * 1.0f / RAND_MAX * PI - PI / 2;
+//
+//        float r = cos(phi);
+//        vec3 V = normalize(vec3(cos(theta) * r, sin(phi), sin(theta) * r));
+//        vec3 f_r = bxdf(mat, L, V, vec3(0, 1, 0), vec2(0, 0));
+//
+//        if(_isnan(f_r.x) || _isnan(f_r.y) || _isnan(f_r.z)) {
+//            glColor3f(1, 0, 0);
+//            glVertex3f(0, 0, 0);
+//            glVertex3f(V.x, V.y, V.z);
+//        } else {
+//            glColor3f(1, 1, 1);
+//            V = V * length(f_r);
+//            glVertex3f(0, 0, 0);
+//            glVertex3f(V.x, V.y, V.z);
+//        }
     }
     glEnd();
 }
