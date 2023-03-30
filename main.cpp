@@ -9,7 +9,7 @@ struct Material {
     vec3 base_color = vec3(1.0f);
     vec3 emission;
     bool is_emit;
-    float metallic = 0.7;
+    float metallic = 0.6;
     float roughness = 0.6;
     float specular = 0.5;
     float specular_tint = 0.5;
