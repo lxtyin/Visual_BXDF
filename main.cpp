@@ -9,8 +9,8 @@ struct Material {
     vec3 base_color = vec3(1.0f);
     vec3 emission;
     bool is_emit;
-    float metallic = 0.5;
-    float roughness = 0.9;
+    float metallic = 0.7;
+    float roughness = 0.6;
     float specular = 0.5;
     float specular_tint = 0.5;
     float sheen;
@@ -20,7 +20,7 @@ struct Material {
     float clearcoat_gloss;
     float anisotropic;
     float index_of_refraction = 1.2;
-    float spec_trans = 0.5;
+    float spec_trans = 0.8;
 };
 
 vec3 to_world(vec3 v, vec3 n) {
@@ -90,33 +90,34 @@ float fresnel(float cosI, float etaI, float etaT) {
 
 // L(in), N(same direction with L), V(out)
 vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
+    if(m.spec_trans < 0.01) return vec3(0);
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
+    if(NdotL <= 0 || NdotV >= 0) return vec3(0);
+    float eta = ior2 / ior1;
+    vec3 H = -normalize(L + eta * V);
+    float NdotH = dot(N, H);
+    if(NdotH <= 0) H = -H;
+    float LdotH = dot(L, H);
+    float VdotH = dot(V, H);
+    if(LdotH * VdotH >= 0) return vec3(0);
 
-	float NdotL = dot(N, L);
-	float NdotV = dot(N, V);
-	if(NdotL <= 0 || NdotV >= 0) return vec3(0);
-	float eta = ior2 / ior1;
-	vec3 H = -normalize(L + eta * V);
-	float NdotH = dot(N, H);
-	if(NdotH <= 0) H = -H;
-	float LdotH = dot(L, H);
-	float VdotH = dot(V, H);
-	if(LdotH * VdotH >= 0) return vec3(0);
+    float m_roughness = m.roughness;
+    float m_metallic = m.metallic;
 
-	float m_roughness = m.roughness;
-	float m_metallic = m.metallic;
-	vec3 m_transmission = sqrt(m.base_color) * m.spec_trans;
+    vec3 m_transmission = sqrt(m.base_color) * m.spec_trans;
 
-	float sqrtDenom = LdotH + eta * VdotH;
-	float Ds = GTR2(NdotH, m_roughness);
-	float iFs = 1 - fresnel(LdotH, ior1, ior2);
-	if(iFs <= 0) return vec3(0, 0, 0); // 全反射
-	float Gs = smithG_GGX(abs(NdotL), m_roughness);
-	Gs *= smithG_GGX(abs(NdotV), m_roughness);
+    float sqrtDenom = LdotH + eta * VdotH;
+    float Ds = GTR2(NdotH, m_roughness);
+    float iFs = 1 - fresnel(LdotH, ior1, ior2);
+    if(iFs <= 0) return vec3(0); // 全反射
+    float Gs = smithG_GGX(abs(NdotL), m_roughness);
+    Gs *= smithG_GGX(abs(NdotV), m_roughness);
 
-	vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Gs * iFs * Ds * m_transmission)
-		/ (NdotV * NdotL * pow2(sqrtDenom)));
+    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Gs * iFs * Ds * m_transmission)
+                          / (NdotV * NdotL * pow2(sqrtDenom)));
 
-	return refraction;
+    return refraction;
 }
 
 vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
@@ -179,7 +180,7 @@ vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 
 void draw() {
 
-    vec3 L = normalize(vec3(-2, 1, 0));
+    vec3 L = normalize(vec3(-1, 1, 0));
     Material mat;
 
     // 坐标系
@@ -213,32 +214,34 @@ void draw() {
     bxdf(mat, L, normalize(vec3(-1, 0.2, 0)), vec3(0, 1, 0), vec2(0, 0));
 
     srand(0);
-    for(int i = 0;i < 100;i++) {
+    for(int i = 0;i < 500;i++) {
 
-        float pdf;
-        vec3 V = GTR2_sample(mat, vec2(0, 0), vec3(0, 0, 1), pdf);
-        glColor3f(1, 1, 1);
-        glVertex3f(0, 0, 0);
-        V = V * pdf;
-        glVertex3f(V.x, V.y, V.z);
+//        float pdf;
+//        vec3 V = GTR2_sample(mat, vec2(0, 0), vec3(0, 1, 0), pdf);
+//        pdf = GTR2_sample_pdf(mat, vec2(0, 0), vec3(0, 1, 0), V);
+//        glColor3f(1, 1, 1);
+//        glVertex3f(0, 0, 0);
+////        V = V * GTR2(dot(V, vec3(0, 0, 1)), mat.roughness);
+////        V = V * pdf;
+//        glVertex3f(V.x, V.y, V.z);
 
-//        float theta = rand() * 1.0f / RAND_MAX * 2 * PI - PI;
-//        float phi = rand() * 1.0f / RAND_MAX * PI - PI / 2;
-//
-//        float r = cos(phi);
-//        vec3 V = normalize(vec3(cos(theta) * r, sin(phi), sin(theta) * r));
-//        vec3 f_r = bxdf(mat, L, V, vec3(0, 1, 0), vec2(0, 0));
-//
-//        if(_isnan(f_r.x) || _isnan(f_r.y) || _isnan(f_r.z)) {
-//            glColor3f(1, 0, 0);
-//            glVertex3f(0, 0, 0);
-//            glVertex3f(V.x, V.y, V.z);
-//        } else {
-//            glColor3f(1, 1, 1);
-//            V = V * length(f_r);
-//            glVertex3f(0, 0, 0);
-//            glVertex3f(V.x, V.y, V.z);
-//        }
+        float theta = rand01() * 2 * PI - PI;
+        float phi = rand01() * PI - PI / 2;
+
+        float r = cos(phi);
+        vec3 V = normalize(vec3(cos(theta) * r, sin(phi), sin(theta) * r));
+        vec3 f_r = bxdf(mat, L, V, vec3(0, 1, 0), vec2(0, 0));
+
+        if(_isnan(f_r.x) || _isnan(f_r.y) || _isnan(f_r.z)) {
+            glColor3f(1, 0, 0);
+            glVertex3f(0, 0, 0);
+            glVertex3f(V.x, V.y, V.z);
+        } else {
+            glColor3f(1, 1, 1);
+            V = V * length(f_r);
+            glVertex3f(0, 0, 0);
+            glVertex3f(V.x, V.y, V.z);
+        }
     }
     glEnd();
 }

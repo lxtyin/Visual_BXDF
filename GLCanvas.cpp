@@ -48,7 +48,7 @@ void GLCanvas::mouse(int button, int state, int x, int y) {
 }
 
 void GLCanvas::motion(int x, int y) {
-	if(mouseButton == GLUT_LEFT_BUTTON) {
+	if(mouseButton == GLUT_RIGHT_BUTTON) {
 		transform.rotation += vec3(0, (mouseX - x) * -0.01, 0);
 		transform.rotation += vec3((mouseY - y) * -0.01, 0, 0);
 		mouseX = x;
@@ -80,7 +80,7 @@ void GLCanvas::initialize(int argc, char** argv, void (*dr)()) {
     glLoadIdentity(); // 指定当前矩阵为单位矩阵
     gluPerspective(90, 1, 0.01, 500);
 
-    transform.position = vec3(0, 0, 10);
+    transform.position = vec3(0, 0, 5);
 
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
