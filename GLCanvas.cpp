@@ -3,6 +3,9 @@
 //
 
 #include "GLCanvas.h"
+#include "imgui/imgui.h"
+#include "imgui/backend/imgui_impl_glut.h"
+#include "imgui/backend/imgui_impl_opengl2.h"
 
 Transform GLCanvas::transform;
 void(*GLCanvas::draw)() = nullptr;
@@ -13,9 +16,17 @@ int GLCanvas::mouseY = 0;
 void GLCanvas::display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplGLUT_NewFrame();
+
     draw();
 
+	ImGui::Render();
+	ImGuiIO& io = ImGui::GetIO();
+	glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
     glutSwapBuffers();
+	glutPostRedisplay();
 }
 
 // x, y: mouse location
@@ -37,6 +48,7 @@ void GLCanvas::keyboard(unsigned char key, int x, int y) {
 	if(key == 'q') exit(0);
 
 	update_camera();
+	ImGui_ImplGLUT_KeyboardFunc(key, x, y);
 }
 
 void GLCanvas::mouse(int button, int state, int x, int y) {
@@ -45,6 +57,7 @@ void GLCanvas::mouse(int button, int state, int x, int y) {
 	mouseButton = button;
 	mouseX = x;
 	mouseY = y;
+	ImGui_ImplGLUT_MouseFunc(button, state, x, y);
 }
 
 void GLCanvas::motion(int x, int y) {
@@ -55,6 +68,7 @@ void GLCanvas::motion(int x, int y) {
 		mouseY = y;
 		update_camera();
 	}
+	ImGui_ImplGLUT_MotionFunc(x, y);
 }
 
 void GLCanvas::update_camera() {
@@ -82,11 +96,28 @@ void GLCanvas::initialize(int argc, char** argv, void (*dr)()) {
 
     transform.position = vec3(0, 0, 5);
 
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	ImGui_ImplGLUT_Init();
+	ImGui_ImplOpenGL2_Init();
+	ImGui_ImplGLUT_InstallFuncs();
+
+	// 输入函数中手动调用ImGui的输入函数
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutMouseFunc(mouse);
 	glutMotionFunc(motion);
 
-    keyboard('w', 0, 0);
+	keyboard('w', 0, 0);
 	glutMainLoop();
+
+	// Cleanup
+	ImGui_ImplOpenGL2_Shutdown();
+	ImGui_ImplGLUT_Shutdown();
+	ImGui::DestroyContext();
 }
